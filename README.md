@@ -199,7 +199,7 @@ featureCounts -a ../../annotation/* -o ../../results/4_final_counts/final_counts
 ## 6. Generate analysis report with MultiQC
 
 ### Description
-[MultiQC: summarize analysis results for multiple tools and samples in a single report](MultiQC: summarize analysis results for multiple tools and samples in a single report)
+[MultiQC: summarize analysis results for multiple tools and samples in a single report](https://pubmed.ncbi.nlm.nih.gov/27312411/)
 MultiQC is a tool to create a single report visualizing output from multiple tools across many samples, including the output of FastQC, Trim_Galore, STAR, and featureCounts.
 
 ### Command
