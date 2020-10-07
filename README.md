@@ -27,7 +27,7 @@ In order to organize all of the files generated from processing the RNA-seq raw 
 ── RNAseq_data/
   │   └── annotation/               <- Genome annotation file (.GTF/.GFF)
   │  
-  │   └── genome/                   <- Host genome file (.FASTA)
+  │   └── genome/                   <- Reference genome file (.FASTA)
   │  
   │   └── input/                    <- Location of input RNAseq data
   │  
@@ -43,3 +43,6 @@ In order to organize all of the files generated from processing the RNA-seq raw 
   │   └── star_index/               <-  Folder to store the indexed genome files from STAR 
   ```
   
+### Download the reference genome
+I downloaded the *Arabidopsis thaliana* reference genome (Araport 11) from the [JGI Genome Porta](https://genome.jgi.doe.gov/portal/pages/dynamicOrganismDownload.jsf?organism=Athaliana). The genome assembly was called `Athaliana: Athaliana_447_TAIR10.fa.gz`
+I downloaded the *Arabidopsis thaliana* annotation (Araport 11) from [TAIR](https://www.arabidopsis.org/download/index-auto.jsp?dir=%2Fdownload_files%2FGenes%2FAraport11_genome_release). The annotation was called `Araport11_GFF3_genes_transposons.201606.gtf`
