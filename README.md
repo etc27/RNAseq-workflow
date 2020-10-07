@@ -20,4 +20,26 @@ Then, I am able to load the conda environment containing all of the required pac
 module load miniconda
 conda activate env_name
 ```
+### Setting up the Folder Structure
+In order to organize all of the files generated from processing the RNA-seq raw data, I utilized the following folder structure adapted from [this RNA-seq workflow](https://github.com/twbattaglia/RNAseq-workflow).
 
+```
+── RNAseq_data/
+  │   └── annotation/               <- Genome annotation file (.GTF/.GFF)
+  │  
+  │   └── genome/                   <- Host genome file (.FASTA)
+  │  
+  │   └── input/                    <- Location of input RNAseq data
+  │  
+  │   └── output/                   <- Data generated during processing steps
+  │       ├── 1_initial_qc/         <- Main alignment files for each sample
+  │       ├── 2_trimmed_output/     <-  Log from running STAR alignment step
+  │       ├── 3_aligned_sequences/  <- Main alignment files for each sample
+  │           ├── aligned_bam/      <-  Alignment files generated from STAR (.BAM)
+  │           ├── aligned_logs/     <- Log from running STAR alignment step
+  │       ├── 4_final_counts/       <- Summarized gene counts across all samples
+  │       ├── 5_multiQC/            <- Overall report of logs for each step
+  │  
+  │   └── star_index/               <-  Folder to store the indexed genome files from STAR 
+  ```
+  
