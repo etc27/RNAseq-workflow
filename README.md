@@ -2,11 +2,11 @@
 Emma Tung Corcoran (10/07/2020)
 
 ## Introduction
-This document covers my basic workflow for processing paired-end RNA sequencing samples and analyzing differential gene expression. I used the [Ruddle HPC cluster at the Yale Center for Research Computing](https://docs.ycrc.yale.edu/clusters-at-yale/clusters/ruddle/) for my HPC environment.
+This document covers my basic workflow for processing paired-end RNA sequencing samples and analyzing differential gene expression. I used the [Ruddle HPC cluster at the Yale Center for Research Computing](https://docs.ycrc.yale.edu/clusters-at-yale/clusters/ruddle/) for my HPC environment. Sections of this workflow were adapted from [this RNA-seq workflow](https://github.com/twbattaglia/RNAseq-workflow).
 
-## Setup
+## 1. Setup
 
-### Setting up Miniconda
+### Set up Miniconda environment
 I followed the directions on the [YCRC Conda Documentation](https://docs.ycrc.yale.edu/clusters-at-yale/guides/conda/) to set up Miniconda as a module on my HPC account. First, I generated a conda environment (name=env_name) containing all of the packages I need for RNA-seq that are not included with the default conda installation.
 
 ```
@@ -20,7 +20,7 @@ Then, I am able to load the conda environment containing all of the required pac
 module load miniconda
 conda activate env_name
 ```
-### Setting up the Folder Structure
+### Set up the folder structure
 In order to organize all of the files generated from processing the RNA-seq raw data, I utilized the following folder structure adapted from [this RNA-seq workflow](https://github.com/twbattaglia/RNAseq-workflow).
 
 ```
@@ -43,6 +43,50 @@ In order to organize all of the files generated from processing the RNA-seq raw 
   │   └── star_index/               <-  Folder to store the indexed genome files from STAR 
   ```
   
-### Download the reference genome
-I downloaded the *Arabidopsis thaliana* reference genome (Araport 11) from the [JGI Genome Porta](https://genome.jgi.doe.gov/portal/pages/dynamicOrganismDownload.jsf?organism=Athaliana). The genome assembly was called `Athaliana: Athaliana_447_TAIR10.fa.gz`
+### Download the reference genome and annotation
+I downloaded the *Arabidopsis thaliana* reference genome (Araport 11) from the [JGI Genome Porta](https://genome.jgi.doe.gov/portal/pages/dynamicOrganismDownload.jsf?organism=Athaliana). The genome assembly was called `Athaliana_447_TAIR10.fa.gz`
 I downloaded the *Arabidopsis thaliana* annotation (Araport 11) from [TAIR](https://www.arabidopsis.org/download/index-auto.jsp?dir=%2Fdownload_files%2FGenes%2FAraport11_genome_release). The annotation was called `Araport11_GFF3_genes_transposons.201606.gtf`
+
+### Download raw sequencing data
+In order to access the sequencing data from the RNA-seq experiments, I followed the directions on the [Ruddle documentation](https://docs.ycrc.yale.edu/clusters-at-yale/clusters/ruddle/#access-sequencing-data). Briefly, the Yale Center for Genome Analysis sent me a url that looks like this: 
+`http://fcb.ycga.yale.edu:3010/randomstring/sample_dir_001` and I used the ycgaFastq tool to make a soft link to the data with the following command.
+```
+/home/bioinfo/software/knightlab/bin_Mar2018/ycgaFastq  fcb.ycga.yale.edu:3010/randomstring/sample_dir_001
+```
+My raw sequencing data contains paired-end Illumina sequencing reads that were rRNA-depleted prior to sequencing.
+
+## 2. Analyze sequence quality with FastQC
+
+### Description
+[FastQC: A quality control tool for high throughput sequence data](http://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
+"FastQC aims to provide a simple way to do some quality control checks on raw sequence data coming from high throughput sequencing pipelines. It provides a modular set of analyses which you can use to give a quick impression of whether your data has any problems of which you should be aware before doing any further analysis."
+
+### Command
+Note: it is not necessary to unzip the fastq file for any of the following processes.
+```
+# Run FastQC
+# -o: output directory
+# --noextract: do not uncompress the output file after creating it
+fastqc -o results/1_initial_qc/ --noextract input/sample.fastq.gz
+```
+
+### Output
+```
+── results/1_initial_qc/
+    └──  sample_fastqc.html   <- HTML file of FastQC quality analysis figures
+    └──  sample_fastqc.zip    <- FastQC report data
+```
+
+## 3. Perform quality control with Trim Galore
+
+### Description
+[Trim Galore: A wrapper tool around Cutadapt and FastQC to consistently apply quality and adapter trimming to FastQ files](http://www.bioinformatics.babraham.ac.uk/projects/trim_galore/)
+Trim Galore performs adapter trimming (the default is the first 13 bp of Illumina standard adapters ('AGATCGGAAGAGC'), but it is able to autodetect the adapter sequence). It also removes sequences that become too short during the trimming process. With the `--paired` option, Trim Galore removes both reads in a pair if at least one of the two sequences becomes shorter than the threshold. Additionally, it can run FastQC on the output files to assess quality once trimming has been completed. I kept the default options for quality and length.
+
+### Command
+```
+# Run Trim Galore! (input is both paired end sequencing files for a sample)
+#--paired: remove both reads in a pair if at least one of the two sequences becomes shorter than the threshold
+#--fastqc: run FastQC in the default mode on the FastQ file once trimming is complete
+trim_galore --paired --fastqc --output_dir results/2_trimmed_output/ input/sample_R1_001.fastq.gz input/sample_R2_001.fastq.gz
+```
