@@ -2,9 +2,12 @@
 Emma Tung Corcoran (10/07/2020)
 
 ## Introduction
-This document covers my basic workflow for processing paired-end RNA sequencing samples and analyzing differential gene expression. I used the [Ruddle HPC cluster at the Yale Center for Research Computing](https://docs.ycrc.yale.edu/clusters-at-yale/clusters/ruddle/) for my HPC environment. Sections of this workflow were adapted from [this RNA-seq workflow](https://github.com/twbattaglia/RNAseq-workflow).
+This document covers my basic workflow for processing paired-end RNA sequencing samples and analyzing differential gene expression. Sections of this workflow were adapted from [this RNA-seq tutorial](https://github.com/twbattaglia/RNAseq-workflow).
 
 ## 1. Setup
+
+### Set up Ruddle account on Yale's HPC clusters
+I used the [Ruddle HPC cluster at the Yale Center for Research Computing](https://docs.ycrc.yale.edu/clusters-at-yale/clusters/ruddle/) for my HPC environment.
 
 ### Set up Miniconda environment
 I followed the directions on the [YCRC Conda Documentation](https://docs.ycrc.yale.edu/clusters-at-yale/guides/conda/) to set up Miniconda as a module on my HPC account. First, I generated a conda environment (name=env_name) containing all of the packages I need for RNA-seq that are not included with the default conda installation.
@@ -53,7 +56,7 @@ In order to access the sequencing data from the RNA-seq experiments, I followed 
 ```
 /home/bioinfo/software/knightlab/bin_Mar2018/ycgaFastq  fcb.ycga.yale.edu:3010/randomstring/sample_dir_001
 ```
-My raw sequencing data contains paired-end Illumina sequencing reads that were rRNA-depleted prior to sequencing.
+My raw sequencing data contains paired-end Illumina sequencing reads that were rRNA-depleted prior to sequencing. Note that the fastq files corresponding to pair1 and pair2 for one sample are labeled `sample_R1_001.fastq.gz` and `sample_R2_001.fastq.gz`
 
 ## 2. Analyze sequence quality with FastQC
 
@@ -88,5 +91,20 @@ Trim Galore performs adapter trimming (the default is the first 13 bp of Illumin
 # Run Trim Galore! (input is both paired end sequencing files for a sample)
 #--paired: remove both reads in a pair if at least one of the two sequences becomes shorter than the threshold
 #--fastqc: run FastQC in the default mode on the FastQ file once trimming is complete
+#--output_dir: output directory
 trim_galore --paired --fastqc --output_dir results/2_trimmed_output/ input/sample_R1_001.fastq.gz input/sample_R2_001.fastq.gz
 ```
+
+### Output
+```
+── results/2_trimmed_output/
+     └──  sample_R1_001_val_1.fq.gz                   <- Compressed trimmed sequencing file (for pair1)
+     └──  sample_R1_001_val_1.html                    <- HTML file of FastQC quality analysis figures (for pair1)
+     └──  sample_R1_001_val_1.zip                     <- FastQC report data (for pair1)
+     └──  sample_R1_001.fastq.gz_trimming_report.txt  <- Cutadapt trimming report (for pair1)
+     └──  sample_R2_001_val_2.fq.gz                   <- Compressed trimmed sequencing file (for pair2)
+     └──  sample_R2_001_val_2.html                    <- HTML file of FastQC quality analysis figures (for pair2)
+     └──  sample_R2_001_val_2.zip                     <- FastQC report data (for pair2)
+     └──  sample_R2_001.fastq.gz_trimming_report.txt  <- Cutadapt trimming report (for pair2)
+```
+
