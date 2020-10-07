@@ -147,7 +147,7 @@ STAR --genomeDir star_index --readFilesCommand zcat \
 
 ### Output
 ```
-── results/4_aligned_sequences/
+── results/3_aligned_sequences/
     └── aligned_bam/sampleAligned.sortedByCoord.out.bam   <- Sorted BAM alignment
     └── aligned_logs/sampleLog.final.out                  <- Summary mapping statistics after mapping job is complete
     └── aligned_logs/sampleLog.out                        <- Main log file with a lot of detailed information about the run
@@ -159,11 +159,11 @@ STAR --genomeDir star_index --readFilesCommand zcat \
 ### Move output files to correct subdirectories
 ```
 # Move the BAM file into the correct folder
-mv -v results/4_aligned_sequences/sampleAligned.sortedByCoord.out.bam results/4_aligned_sequences/aligned_bam/
+mv -v results/3_aligned_sequences/sampleAligned.sortedByCoord.out.bam results/3_aligned_sequences/aligned_bam/
 
 # Move the logs into the correct folder
-mv -v results/4_aligned_sequences/*.out results/4_aligned_sequences/aligned_logs/
-mv -v results/4_aligned_sequences/*.out.tab results/4_aligned_sequences/aligned_logs/
+mv -v results/3_aligned_sequences/*.out results/3_aligned_sequences/aligned_logs/
+mv -v results/3_aligned_sequences/*.out.tab results/3_aligned_sequences/aligned_logs/
 ```
 
 ## 5. Summarize gene counts with featureCounts
@@ -175,7 +175,7 @@ featureCounts is a read summarization program that can count reads from RNA sequ
 ### Command
 ```
 # Change directory into the aligned .BAM folder
-cd results/4_aligned_sequences/aligned_bam
+cd results/3_aligned_sequences/aligned_bam
 
 # Store list of files as a variable
 dirlist=$(ls -t ./*.bam | tr '\n' ' ')
@@ -186,12 +186,12 @@ echo $dirlist
 #-o: path to output results
 #-g: attribute type (i.e. gene_id or gene_name)
 #-T: number of threads
-featureCounts -a ../../annotation/* -o ../../results/5_final_counts/final_counts.txt -g 'gene_name' -T 4 $dirlist
+featureCounts -a ../../annotation/* -o ../../results/4_final_counts/final_counts.txt -g 'gene_name' -T 4 $dirlist
 ```
 
 ### Output
 ```
-── results/5_final_counts/
+── results/4_final_counts/
     └── final_counts.txt                <- Final gene counts across all samples
     └── final_counts.txt.summary        <- Summary of gene counts
 ```
@@ -206,12 +206,12 @@ MultiQC is a tool to create a single report visualizing output from multiple too
 ```
 # Run multiQC
 #--outdir: output directory
-multiqc results --outdir results/6_multiQC
+multiqc results --outdir results/5_multiQC
 ```
 
 ### Output
 ```
-── results/6_multiQC/
+── results/5_multiQC/
     └── multiqc_report.html     <- Figures representing the logs from each step
     └── multiqc_data/           <- Folder of data that multiqc found from various log files
 ```
