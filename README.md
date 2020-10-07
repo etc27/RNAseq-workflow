@@ -2,12 +2,9 @@
 Emma Tung Corcoran (10/07/2020)
 
 ## Introduction
-This document covers my basic workflow for processing paired-end RNA sequencing samples and analyzing differential gene expression. Sections of this workflow were adapted from [this RNA-seq tutorial](https://github.com/twbattaglia/RNAseq-workflow).
+This document covers my basic workflow for processing paired-end RNA sequencing samples and analyzing differential gene expression. I used the [Ruddle HPC cluster at the Yale Center for Research Computing](https://docs.ycrc.yale.edu/clusters-at-yale/clusters/ruddle/) for my HPC environment. Sections of this workflow were adapted from [this RNA-seq tutorial](https://github.com/twbattaglia/RNAseq-workflow).
 
 ## 1. Setup
-
-### Set up Ruddle account on Yale's HPC clusters
-I used the [Ruddle HPC cluster at the Yale Center for Research Computing](https://docs.ycrc.yale.edu/clusters-at-yale/clusters/ruddle/) for my HPC environment.
 
 ### Set up Miniconda environment
 I followed the directions on the [YCRC Conda Documentation](https://docs.ycrc.yale.edu/clusters-at-yale/guides/conda/) to set up Miniconda as a module on my HPC account. First, I generated a conda environment (name=env_name) containing all of the packages I need for RNA-seq that are not included with the default conda installation.
@@ -47,8 +44,8 @@ In order to organize all of the files generated from processing the RNA-seq raw 
   ```
   
 ### Download the reference genome and annotation
-I downloaded the *Arabidopsis thaliana* reference genome (Araport 11) from the [JGI Genome Porta](https://genome.jgi.doe.gov/portal/pages/dynamicOrganismDownload.jsf?organism=Athaliana). The genome assembly was called `Athaliana_447_TAIR10.fa.gz`
-I downloaded the *Arabidopsis thaliana* annotation (Araport 11) from [TAIR](https://www.arabidopsis.org/download/index-auto.jsp?dir=%2Fdownload_files%2FGenes%2FAraport11_genome_release). The annotation was called `Araport11_GFF3_genes_transposons.201606.gtf`
+I downloaded the *Arabidopsis thaliana* reference genome (Araport 11) from the [JGI Genome Porta](https://genome.jgi.doe.gov/portal/pages/dynamicOrganismDownload.jsf?organism=Athaliana) to the `genome/` folder. The genome assembly was called `Athaliana_447_TAIR10.fa.gz`
+I downloaded the *Arabidopsis thaliana* annotation (Araport 11) from [TAIR](https://www.arabidopsis.org/download/index-auto.jsp?dir=%2Fdownload_files%2FGenes%2FAraport11_genome_release) to the `annotation/` folder. The annotation was called `Araport11_GFF3_genes_transposons.201606.gtf`
 
 ### Download raw sequencing data
 In order to access the sequencing data from the RNA-seq experiments, I followed the directions on the [Ruddle documentation](https://docs.ycrc.yale.edu/clusters-at-yale/clusters/ruddle/#access-sequencing-data). Briefly, the Yale Center for Genome Analysis sent me a url that looks like this: 
@@ -99,12 +96,30 @@ trim_galore --paired --fastqc --output_dir results/2_trimmed_output/ input/sampl
 ```
 ── results/2_trimmed_output/
      └──  sample_R1_001_val_1.fq.gz                   <- Compressed trimmed sequencing file (for pair1)
-     └──  sample_R1_001_val_1.html                    <- HTML file of FastQC quality analysis figures (for pair1)
-     └──  sample_R1_001_val_1.zip                     <- FastQC report data (for pair1)
+     └──  sample_R1_001_val_1_fastqc.html                    <- HTML file of FastQC quality analysis figures (for pair1)
+     └──  sample_R1_001_val_1_fastqc.zip                     <- FastQC report data (for pair1)
      └──  sample_R1_001.fastq.gz_trimming_report.txt  <- Cutadapt trimming report (for pair1)
      └──  sample_R2_001_val_2.fq.gz                   <- Compressed trimmed sequencing file (for pair2)
-     └──  sample_R2_001_val_2.html                    <- HTML file of FastQC quality analysis figures (for pair2)
-     └──  sample_R2_001_val_2.zip                     <- FastQC report data (for pair2)
+     └──  sample_R2_001_val_2_fastqc.html                    <- HTML file of FastQC quality analysis figures (for pair2)
+     └──  sample_R2_001_val_2_fastqc.zip                     <- FastQC report data (for pair2)
      └──  sample_R2_001.fastq.gz_trimming_report.txt  <- Cutadapt trimming report (for pair2)
 ```
 
+## 4. Align reads to genome with STAR
+
+### Description
+[STAR: ultrafast universal RNA-seq aligner](https://pubmed.ncbi.nlm.nih.gov/23104886/)
+STAR (Spliced Transcripts Alignment to a Reference) is an ultrafast alignment software for aligned RNA-seq data to genomes.
+
+### Generating index
+Before running STAR, it is necessary to generate an index of your reference genome. I stored this index in the `star_index` folder. It is only necessary to run this step once.
+```
+#Generate genome index for STAR
+#--runMode: directs STAR to run genome indices generation job
+#--genomeDir: specifies path to the directory where the genome indices are stored
+#--genomeFastaFiles: specifies one or more FASTA files with the genome reference sequences
+#--sjdbGTFfile: specifies the path to the file with annotated transcripts in the standard GTF format
+#--genomeSAindexNbases: length (bases) of the SA pre-indexing string. Typically between 10 and 15. Longer strings will use much more memory, but allow faster searches
+#--runThreadN: number of threads
+STAR --runMode genomeGenerate --genomeDir star_index --genomeFastaFiles genome/* --sjdbGTFfile annotation/* --genomeSAindexNbases 12 --runThreadN 4
+```
