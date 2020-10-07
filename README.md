@@ -204,3 +204,14 @@ MultiQC is a tool to create a single report visualizing output from multiple too
 
 ### Command
 ```
+# Run multiQC
+#--outdir: output directory
+multiqc results --outdir results/6_multiQC
+```
+
+### Output
+```
+── results/6_multiQC/
+    └── multiqc_report.html     <- Figures representing the logs from each step
+    └── multiqc_data/           <- Folder of data that multiqc found from various log files
+```
