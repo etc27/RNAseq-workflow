@@ -67,6 +67,7 @@ Note: it is not necessary to unzip the fastq file for any of the following proce
 # Run FastQC
 # -o: output directory
 # --noextract: do not uncompress the output file after creating it
+
 fastqc -o results/1_initial_qc/ --noextract input/sample.fastq.gz
 ```
 
@@ -89,6 +90,7 @@ Trim Galore performs adapter trimming (the default is the first 13 bp of Illumin
 #--paired: remove both reads in a pair if at least one of the two sequences becomes shorter than the threshold
 #--fastqc: run FastQC in the default mode on the FastQ file once trimming is complete
 #--output_dir: output directory
+
 trim_galore --paired --fastqc --output_dir results/2_trimmed_output/ input/sample_R1_001.fastq.gz input/sample_R2_001.fastq.gz
 ```
 
@@ -121,6 +123,7 @@ Before running STAR, it is necessary to generate an index of your reference geno
 #--sjdbGTFfile: specifies the path to the file with annotated transcripts in the standard GTF format
 #--genomeSAindexNbases: length (bases) of the SA pre-indexing string. Typically between 10 and 15. Longer strings will use much more memory, but allow faster searches
 #--runThreadN: number of threads
+
 STAR --runMode genomeGenerate --genomeDir star_index --genomeFastaFiles genome/* --sjdbGTFfile annotation/* --genomeSAindexNbases 12 --runThreadN 4
 ```
 
@@ -140,4 +143,25 @@ STAR --genomeDir star_index --readFilesCommand zcat \
 --readFilesIn results/2_trimmed_output/sample_R1_001_val_1.fq.gz results/2_trimmed_output/sample_val_2.fq.gz \
 --outFilterMismatchNmax 2 --runThreadN 4 --outSAMtype BAM SortedByCoordinate --quantMode GeneCounts \
 --outFileNamePrefix results/4_aligned_sequences/sample
+```
+
+### Output
+```
+── results/4_aligned_sequences/
+    └── aligned_bam/sampleAligned.sortedByCoord.out.bam   <- Sorted BAM alignment
+    └── aligned_logs/sampleLog.final.out                  <- Summary mapping statistics after mapping job is complete
+    └── aligned_logs/sampleLog.out                        <- Main log file with a lot of detailed information about the run
+    └── aligned_logs/sampleLog.progress.out               <- Reports job progress statistics taken in 1-minute intervals
+    └── aligned_logs/sampleReadsPerGene.out.tab           <- Output containing counts per gene in tab-delimited format
+    └── aligned_logs/sampleSJ.out.tab                     <- Contains high confidence collapsed splice junctions in tab-delimited format
+```
+
+### Move output files to correct subdirectories
+```
+# Move the BAM file into the correct folder
+mv -v results/4_aligned_sequences/sampleAligned.sortedByCoord.out.bam results/4_aligned_sequences/aligned_bam/
+
+# Move the logs into the correct folder
+mv -v results/4_aligned_sequences/*.out results/4_aligned_sequences/aligned_logs/
+mv -v results/4_aligned_sequences/*.out.tab results/4_aligned_sequences/aligned_logs/
 ```
