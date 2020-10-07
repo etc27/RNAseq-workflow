@@ -29,18 +29,18 @@ In order to organize all of the files generated from processing the RNA-seq raw 
   │  
   │   └── genome/                   <- Reference genome file (.FASTA)
   │  
-  │   └── input/                    <- Location of input RNAseq data
+  │   └── input/                    <- Location of input RNA-seq data
   │  
-  │   └── output/                   <- Data generated during processing steps
-  │       ├── 1_initial_qc/         <- Main alignment files for each sample
-  │       ├── 2_trimmed_output/     <-  Log from running STAR alignment step
+  │   └── results/                  <- Data generated during processing steps
+  │       ├── 1_initial_qc/         <- Quality check of input files
+  │       ├── 2_trimmed_output/     <- Trimmed read files and quality check of trimmed reads
   │       ├── 3_aligned_sequences/  <- Main alignment files for each sample
-  │           ├── aligned_bam/      <-  Alignment files generated from STAR (.BAM)
+  │           ├── aligned_bam/      <- Alignment files generated from STAR (.BAM)
   │           ├── aligned_logs/     <- Log from running STAR alignment step
   │       ├── 4_final_counts/       <- Summarized gene counts across all samples
   │       ├── 5_multiQC/            <- Overall report of logs for each step
   │  
-  │   └── star_index/               <-  Folder to store the indexed genome files from STAR 
+  │   └── star_index/               <- Folder to store the indexed genome files from STAR 
   ```
   
 ### Download the reference genome and annotation
@@ -95,14 +95,14 @@ trim_galore --paired --fastqc --output_dir results/2_trimmed_output/ input/sampl
 ### Output
 ```
 ── results/2_trimmed_output/
-     └──  sample_R1_001_val_1.fq.gz                   <- Compressed trimmed sequencing file (for pair1)
-     └──  sample_R1_001_val_1_fastqc.html                    <- HTML file of FastQC quality analysis figures (for pair1)
-     └──  sample_R1_001_val_1_fastqc.zip                     <- FastQC report data (for pair1)
-     └──  sample_R1_001.fastq.gz_trimming_report.txt  <- Cutadapt trimming report (for pair1)
-     └──  sample_R2_001_val_2.fq.gz                   <- Compressed trimmed sequencing file (for pair2)
-     └──  sample_R2_001_val_2_fastqc.html                    <- HTML file of FastQC quality analysis figures (for pair2)
-     └──  sample_R2_001_val_2_fastqc.zip                     <- FastQC report data (for pair2)
-     └──  sample_R2_001.fastq.gz_trimming_report.txt  <- Cutadapt trimming report (for pair2)
+     └──  sample_R1_001_val_1.fq.gz                   <- Compressed trimmed sequencing file (for read1)
+     └──  sample_R1_001_val_1_fastqc.html                    <- HTML file of FastQC quality analysis figures (for read1)
+     └──  sample_R1_001_val_1_fastqc.zip                     <- FastQC report data (for read1)
+     └──  sample_R1_001.fastq.gz_trimming_report.txt  <- Cutadapt trimming report (for read1)
+     └──  sample_R2_001_val_2.fq.gz                   <- Compressed trimmed sequencing file (for read2)
+     └──  sample_R2_001_val_2_fastqc.html                    <- HTML file of FastQC quality analysis figures (for read2)
+     └──  sample_R2_001_val_2_fastqc.zip                     <- FastQC report data (for read2)
+     └──  sample_R2_001.fastq.gz_trimming_report.txt  <- Cutadapt trimming report (for read2)
 ```
 
 ## 4. Align reads to genome with STAR
@@ -114,7 +114,7 @@ STAR (Spliced Transcripts Alignment to a Reference) is an ultrafast alignment so
 ### Generating index
 Before running STAR, it is necessary to generate an index of your reference genome. I stored this index in the `star_index` folder. It is only necessary to run this step once.
 ```
-#Generate genome index for STAR
+# Generate genome index for STAR
 #--runMode: directs STAR to run genome indices generation job
 #--genomeDir: specifies path to the directory where the genome indices are stored
 #--genomeFastaFiles: specifies one or more FASTA files with the genome reference sequences
@@ -122,4 +122,22 @@ Before running STAR, it is necessary to generate an index of your reference geno
 #--genomeSAindexNbases: length (bases) of the SA pre-indexing string. Typically between 10 and 15. Longer strings will use much more memory, but allow faster searches
 #--runThreadN: number of threads
 STAR --runMode genomeGenerate --genomeDir star_index --genomeFastaFiles genome/* --sjdbGTFfile annotation/* --genomeSAindexNbases 12 --runThreadN 4
+```
+
+### Command
+```
+# Run STAR
+#--genomeDir: specifies path to the directory where the genome indices are stored
+#--readFilesCommand: indicates to uncompress .gz files
+#--readFilesIn: path of the files with the sequences to be mapped (for paired-end reads, read1 and read2 files have to be supplied)
+#--outFilterMismatchNmax: maximum number of mismatches per pair
+#runThreadN: number of threads
+#--outSAMtype: output format (BAM SortedByCoordinate = output sorted by coordinate)
+#--quantMode: GeneCounts specifies for STAR to count the number of reads per gene while mapping
+#--outFileNamePrefix: output files name prefix
+
+STAR --genomeDir star_index --readFilesCommand zcat \
+--readFilesIn results/2_trimmed_output/sample_R1_001_val_1.fq.gz results/2_trimmed_output/sample_val_2.fq.gz \
+--outFilterMismatchNmax 2 --runThreadN 4 --outSAMtype BAM SortedByCoordinate --quantMode GeneCounts \
+--outFileNamePrefix results/4_aligned_sequences/sample
 ```
