@@ -165,3 +165,42 @@ mv -v results/4_aligned_sequences/sampleAligned.sortedByCoord.out.bam results/4_
 mv -v results/4_aligned_sequences/*.out results/4_aligned_sequences/aligned_logs/
 mv -v results/4_aligned_sequences/*.out.tab results/4_aligned_sequences/aligned_logs/
 ```
+
+## 5. Summarize gene counts with featureCounts
+
+### Description
+[featureCounts: an efficient general purpose program for assigning sequence reads to genomic features](https://pubmed.ncbi.nlm.nih.gov/24227677/)
+featureCounts is a read summarization program that can count reads from RNA sequencing experiments (it is also capable of counting reads from DNA sequencing experiments).
+
+### Command
+```
+# Change directory into the aligned .BAM folder
+cd results/4_aligned_sequences/aligned_bam
+
+# Store list of files as a variable
+dirlist=$(ls -t ./*.bam | tr '\n' ' ')
+echo $dirlist
+
+# Run featureCounts on all of the samples
+#-a: path to annotation
+#-o: path to output results
+#-g: attribute type (i.e. gene_id or gene_name)
+#-T: number of threads
+featureCounts -a ../../annotation/* -o ../../results/5_final_counts/final_counts.txt -g 'gene_name' -T 4 $dirlist
+```
+
+### Output
+```
+── results/5_final_counts/
+    └── final_counts.txt                <- Final gene counts across all samples
+    └── final_counts.txt.summary        <- Summary of gene counts
+```
+
+## 6. Generate analysis report with MultiQC
+
+### Description
+[MultiQC: summarize analysis results for multiple tools and samples in a single report](MultiQC: summarize analysis results for multiple tools and samples in a single report)
+MultiQC is a tool to create a single report visualizing output from multiple tools across many samples, including the output of FastQC, Trim_Galore, STAR, and featureCounts.
+
+### Command
+```
