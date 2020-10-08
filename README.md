@@ -164,6 +164,17 @@ STAR --genomeDir star_index --readFilesCommand zcat \
 --outFileNamePrefix results/4_aligned_sequences/sample
 ```
 
+### Move output files to correct subdirectories
+```
+# Move the BAM file into the correct folder
+mv -v results/3_aligned_sequences/sampleAligned.sortedByCoord.out.bam results/3_aligned_sequences/aligned_bam/
+
+# Move the logs into the correct folder
+mv -v results/3_aligned_sequences/*.out results/3_aligned_sequences/aligned_logs/
+mv -v results/3_aligned_sequences/*.out.tab results/3_aligned_sequences/aligned_logs/
+```
+
+
 ### Output
 ```
 ── results/3_aligned_sequences/
@@ -173,16 +184,6 @@ STAR --genomeDir star_index --readFilesCommand zcat \
     └── aligned_logs/sampleLog.progress.out               <- Reports job progress statistics taken in 1-minute intervals
     └── aligned_logs/sampleReadsPerGene.out.tab           <- Output containing counts per gene in tab-delimited format
     └── aligned_logs/sampleSJ.out.tab                     <- Contains high confidence collapsed splice junctions in tab-delimited format
-```
-
-### Move output files to correct subdirectories
-```
-# Move the BAM file into the correct folder
-mv -v results/3_aligned_sequences/sampleAligned.sortedByCoord.out.bam results/3_aligned_sequences/aligned_bam/
-
-# Move the logs into the correct folder
-mv -v results/3_aligned_sequences/*.out results/3_aligned_sequences/aligned_logs/
-mv -v results/3_aligned_sequences/*.out.tab results/3_aligned_sequences/aligned_logs/
 ```
 
 ## 5. Summarize gene counts with featureCounts
