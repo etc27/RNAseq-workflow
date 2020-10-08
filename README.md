@@ -58,7 +58,7 @@ My raw sequencing data contains paired-end Illumina sequencing reads that were r
 ## 2. Analyze sequence quality with FastQC
 
 ### Description
-[FastQC: A quality control tool for high throughput sequence data](http://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
+[FastQC: A quality control tool for high throughput sequence data.](http://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
 "FastQC aims to provide a simple way to do some quality control checks on raw sequence data coming from high throughput sequencing pipelines. It provides a modular set of analyses which you can use to give a quick impression of whether your data has any problems of which you should be aware before doing any further analysis."
 
 ### Command
@@ -100,7 +100,7 @@ Finally, the **Sequence Duplication Levels** displays the relative level of dupl
 ## 3. Perform quality control with Trim Galore
 
 ### Description
-[Trim Galore: A wrapper tool around Cutadapt and FastQC to consistently apply quality and adapter trimming to FastQ files](http://www.bioinformatics.babraham.ac.uk/projects/trim_galore/)
+[Trim Galore: A wrapper tool around Cutadapt and FastQC to consistently apply quality and adapter trimming to FastQ files.](http://www.bioinformatics.babraham.ac.uk/projects/trim_galore/)
 Trim Galore performs adapter trimming (the default is the first 13 bp of Illumina standard adapters ('AGATCGGAAGAGC'), but it is able to autodetect the adapter sequence). It also removes sequences that become too short during the trimming process. With the `--paired` option, Trim Galore removes both reads in a pair if at least one of the two sequences becomes shorter than the threshold. Additionally, it can run FastQC on the output files to assess quality once trimming has been completed. I kept the default options for quality and length.
 
 ### Command
@@ -129,7 +129,7 @@ trim_galore --paired --fastqc --output_dir results/2_trimmed_output/ input/sampl
 ## 4. Align reads to genome with STAR
 
 ### Description
-[STAR: ultrafast universal RNA-seq aligner](https://pubmed.ncbi.nlm.nih.gov/23104886/)
+[STAR: ultrafast universal RNA-seq aligner.](https://pubmed.ncbi.nlm.nih.gov/23104886/)
 STAR (Spliced Transcripts Alignment to a Reference) is an ultrafast alignment software for aligned RNA-seq data to genomes.
 
 ### Generating index
@@ -189,7 +189,7 @@ mv -v results/3_aligned_sequences/*.out.tab results/3_aligned_sequences/aligned_
 ## 5. Summarize gene counts with featureCounts
 
 ### Description
-[featureCounts: an efficient general purpose program for assigning sequence reads to genomic features](https://pubmed.ncbi.nlm.nih.gov/24227677/)
+[featureCounts: an efficient general purpose program for assigning sequence reads to genomic features.](https://pubmed.ncbi.nlm.nih.gov/24227677/)
 featureCounts is a read summarization program that can count reads from RNA sequencing experiments (it is also capable of counting reads from DNA sequencing experiments).
 
 ### Command
@@ -219,7 +219,7 @@ featureCounts -a ../../annotation/* -o ../../results/4_final_counts/final_counts
 ## 6. Generate analysis report with MultiQC
 
 ### Description
-[MultiQC: summarize analysis results for multiple tools and samples in a single report](https://pubmed.ncbi.nlm.nih.gov/27312411/)
+[MultiQC: summarize analysis results for multiple tools and samples in a single report.](https://pubmed.ncbi.nlm.nih.gov/27312411/)
 MultiQC is a tool to create a single report visualizing output from multiple tools across many samples, including the output of FastQC, Trim_Galore, STAR, and featureCounts.
 
 ### Command
