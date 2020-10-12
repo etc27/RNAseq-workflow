@@ -207,6 +207,7 @@ echo $dirlist
 #-g: attribute type (i.e. gene_id or gene_name)
 #-T: number of threads
 #-M: count multi-mapping reads (--fraction: a fractional count 1/n will be generated for each multi-mapping read, where n is the number of alignments reported for the read)
+#-p: specified for paired-end reads
 featureCounts -a ../../annotation/* -o ../../results/4_final_counts/final_counts.txt -g 'gene_name' -T 4 -M --fraction $dirlist
 ```
 
