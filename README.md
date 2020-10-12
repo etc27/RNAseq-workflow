@@ -238,3 +238,6 @@ multiqc results --outdir results/5_multiQC
 
 ### Explanation of MultiQC Figures
 MultiQC summarizes results from FastQC before and after trimming, as well as logs from the alignment and gene counts steps. Many of the figures in MultiQC are the same or similar to those produced from FastQC (see FastQC section above). One new figure in the FastQC section is **Sequence Counts**, displaying the sequence counts for each sample divided into unique reads and estimated duplicate reads. The ratio of unique to duplicate reads gives information about library complexity vs. sequencing depth.
+
+#### Assessing Quality of Sequencing Data using MultiQC
+The main figures I check in the MultiQC analysis are the **Sequence Quality** figures to ensure the quality of the reads and **Alignment Scores** to assess the percentage of reads mapped. If the sequence quality looks good and I have at least 80% reads mapped for the sample, then the data are considered OK.
