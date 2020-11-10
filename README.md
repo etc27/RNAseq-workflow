@@ -245,4 +245,4 @@ MultiQC summarizes results from FastQC before and after trimming, as well as log
 The main figures I check in the MultiQC analysis are the **Sequence Quality** figures to ensure the quality of the reads and **Alignment Scores** to assess the percentage of reads mapped. If the sequence quality looks good and I have at least 80% reads mapped for the sample, then the data are considered OK.
 
 ## 7. Import Gene Counts into RStudio
-After completing the above workflow, I download final_counts.txt from the 5_final_counts folder onto my personal computer and use **RStudio** to normalize and perform statistical analysis between sample groups.
+After completing the above workflow, I download final_counts.txt from the 5_final_counts folder onto my personal computer and use **RStudio** to normalize and perform statistical analysis between sample groups. An example of the R code that I use to perform this analysis is uploaded into the **R** folder.
