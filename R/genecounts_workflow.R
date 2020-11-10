@@ -824,29 +824,3 @@ pathway_plots(results_sig_chrvsCol, "chr11chr17")
 pathway_plots(results_sig_H4WTvsCol, "H4 WT")
 pathway_plots(results_sig_R17AvsH4WT, "R17A vs H4 WT")
 pathway_plots(results_sig_R35KvsH4WT, "R35K vs H4 WT")
-
-####Generate barplots of DEG common to R17A and chr11chr17
-#Enrich genes using KEGG database
-kegg_enrich <- enrichKEGG(gene = c(R17Aandchr_down,R17Aandchr_up), organism = 'ath', pvalueCutoff = 0.05, qvalueCutoff = 0.10)
-# Plot results
-barplot(kegg_enrich, drop = TRUE, showCategory = 10, title = paste("R17A and chr11chr17 KEGG Enrichment Pathways"), font.size = 8)
-ggsave(paste("Pathways/R17A and chr11chr17 KEGG Enrichment Pathways.pdf"), device=pdf())
-#Enrich genes using Gene Ontology
-go_enrich <- enrichGO(gene = c(R17Aandchr_down_entrez,R17Aandchr_up_entrez), OrgDb = 'org.At.tair.db', readable = T,
-                      ont = "BP", pvalueCutoff = 0.05, qvalueCutoff = 0.10)
-# Plot results
-barplot(go_enrich,drop = TRUE, showCategory = 10, title = paste("R17A and chr11chr17 GO Biological Pathways"), font.size = 8)
-ggsave(paste("Pathways/R17A and chr11chr17 GO Biological Pathways.pdf"), device=pdf())
-
-##most significant DEG genes between R17A and chr11chr17
-#Enrich genes using KEGG database
-kegg_enrich <- enrichKEGG(gene = R17Aandchr_mostsig, organism = 'ath', pvalueCutoff = 0.05, qvalueCutoff = 0.10)
-# Plot results
-barplot(kegg_enrich, drop = TRUE, showCategory = 10, title = paste("R17A and chr11chr17 (>2-fold change) KEGG Enrichment Pathways"), font.size = 8)
-ggsave(paste("Pathways/R17A and chr11chr17 (>2-fold) KEGG Enrichment Pathways.pdf"), device=pdf())
-#Enrich genes using Gene Ontology
-go_enrich <- enrichGO(gene = R17Aandchr_mostsig_entrez, OrgDb = 'org.At.tair.db', readable = T,
-                      ont = "BP", pvalueCutoff = 0.05, qvalueCutoff = 0.10)
-# Plot results
-barplot(go_enrich,drop = TRUE, showCategory = 10, title = "R17A and chr11chr17 (>2-fold) GO Biological Pathways", font.size = 8)
-ggsave("Pathways/R17A and chr11chr17 (>2-fold) GO Biological Pathways.pdf", device=pdf())
