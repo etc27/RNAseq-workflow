@@ -1,0 +1,807 @@
+rm(list=ls())
+
+#https://github.com/twbattaglia/RNAseq-workflow
+
+#Set working directory
+setwd("/Users/emmacorcoran/Documents/R Scripts/RNA-seq/2021_05_21 RNA-seq temp")
+
+#Load libraries
+#To install package use: BiocManager::install("packagename")
+library(DESeq2)
+library(ggplot2)
+library(clusterProfiler)
+library(biomaRt)
+library(ReactomePA)
+library(DOSE)
+library(KEGG.db)
+library(org.At.tair.db) #Arabidopsis thaliana genome annotation
+library(pheatmap)
+library(genefilter)
+library(RColorBrewer)
+library(GO.db)
+library(topGO)
+library(dplyr)
+library(gage)
+library(ggsci)
+library(apeglm)
+library(plotly)
+library(ggrepel)
+library("VennDiagram")
+library(tidyverse)
+
+
+######Import featureCounts output
+# Import gene counts table
+# - skip first row
+# - make row names the gene identifiers
+countdata = read.table("final_counts.txt", header = TRUE, as.is=T, skip = 1, row.names = 1)
+
+# Remove Aligned.sortedByCoord.out.bam + '..' from column identifiers
+colnames(countdata) = gsub(".Aligned.sortedByCoord.out.bam", "", colnames(countdata), fixed = T)
+colnames(countdata) = gsub("..", "", colnames(countdata), fixed = T)
+
+# Remove "_R1_001" from column identifiers
+colnames(countdata) = gsub("_R1_001", "", colnames(countdata), fixed = T)
+
+# Remove first five columns
+countdata = countdata[ ,c(-1:-5)]
+
+# Make sure ID's are correct
+head(countdata)
+
+#remove chloroplast and mitochrondria reads - ATC... and ATM...
+toremove = c()
+for (i in 1:nrow(countdata)) {
+  chrnum = substr(toString(rownames(countdata)[i]),3,3)
+  if (chrnum == "C") {
+    toremove = c(toremove,i)
+  }
+  else if(chrnum == "M") {
+    toremove = c(toremove,i)
+  }
+}
+fivechr_countdata = countdata[-toremove,]
+countdata = fivechr_countdata
+
+###Separate genes by expression level (Col)
+sorted_counts = countdata[order(round(countdata$Col.1), decreasing=TRUE), ]
+
+#######Import metadata csv file
+# Import metadata file
+metadata = read.csv("metadata.csv", as.is=T, header=T, row.names = 1)
+
+# Reorder sampleID's to match featureCounts column order. 
+metadata = metadata[match(colnames(countdata), metadata$sampleid), ]
+
+# Make sure ID's are correct
+head(metadata)
+
+####FOR NOW - REMOVE RLT12.2 AND 68.18D.1 UNTIL IT GETS RESEQUENCED
+countdata = countdata[ ,-c(1,7)]
+metadata = metadata[-c(1,7),]
+head(countdata)
+head(metadata)
+
+
+######Make DESeq2 object from counts and metadata
+# - heatmap : count dataframe (rounded to nearest integer)
+# - colData : sample metadata in the dataframe (row names correspond to columns of heatmap)
+# - design : The design of the comparisons to use. 
+#            Use (~) before the name of the column variable to compare
+ddsMat_Col = DESeqDataSetFromMatrix(countData = round(countdata), colData = metadata, design = ~Group)
+
+#Set the "reference" condition
+ddsMat_Col$Group = relevel(ddsMat_Col$Group, ref = "Col")
+
+#Calculate FPM
+fpm_Col = fpm(ddsMat_Col)
+
+#Sort
+sorted_fpm = fpm_Col[order(round(rowMeans(cbind(fpm_Col[,9], fpm_Col[,8]))), decreasing=TRUE), ]
+over10_fpm = sorted_fpm[rowMeans(cbind(sorted_fpm[,9], sorted_fpm[,8]))>10, ]
+over50_fpm = sorted_fpm[rowMeans(cbind(sorted_fpm[,9], sorted_fpm[,8]))>50, ]
+write.table(rownames(over10_fpm), "over10fpm_Col.txt", quote=F, col.names=F, row.names = F)
+write.table(rownames(over50_fpm), "over50fpm_Col.txt", quote=F, col.names=F, row.names = F)
+
+# Find differential expressed genes
+ddsMat_Col = DESeq(ddsMat_Col)
+
+#Retrieve results table and make data frame
+#Samples normalized to Col values
+resultsNames(ddsMat_Col)
+res_68.18DvsCol = results(ddsMat_Col, pAdjustMethod = "fdr", alpha = 0.05, name="Group_68.18D_vs_Col")
+res_68.18DvsCol = as.data.frame(res_68.18DvsCol)
+res_13.6vsCol = results(ddsMat_Col, pAdjustMethod = "fdr", alpha = 0.05, name="Group_13.6_vs_Col")
+res_13.6vsCol = as.data.frame(res_13.6vsCol)
+res_arid5vsCol = results(ddsMat_Col, pAdjustMethod = "fdr", alpha = 0.05, name="Group_arid5_vs_Col")
+res_arid5vsCol = as.data.frame(res_arid5vsCol)
+res_rlt12vsCol = results(ddsMat_Col, pAdjustMethod = "fdr", alpha = 0.05, name="Group_rlt12_vs_Col")
+res_rlt12vsCol = as.data.frame(res_rlt12vsCol)
+
+# Sort the results table by adjusted p-value and remove NA adjusted p-values
+# Samples normalized to Col values
+resordered_68.18DvsCol = data.frame(res_68.18DvsCol[order(res_68.18DvsCol$padj, na.last=NA),])
+resordered_13.6vsCol = data.frame(res_13.6vsCol[order(res_13.6vsCol$padj, na.last=NA),])
+resordered_arid5vsCol = data.frame(res_arid5vsCol[order(res_arid5vsCol$padj, na.last=NA),])
+resordered_rlt12vsCol = data.frame(res_rlt12vsCol[order(res_rlt12vsCol$padj, na.last=NA),])
+
+#How many adjusted p-values were less than 0.01?
+sum(resordered_68.18DvsCol$padj < 0.01, na.rm=TRUE)
+sum(resordered_13.6vsCol$padj < 0.01, na.rm=TRUE)
+sum(resordered_arid5vsCol$padj < 0.01, na.rm=TRUE)
+sum(resordered_rlt12vsCol$padj < 0.01, na.rm=TRUE)
+
+# Get genes with adjusted p-values less than 0.01 and log2FoldChange >= 1 and write to table
+topDEgenes_68.18DvsCol <- rownames(resordered_68.18DvsCol[resordered_68.18DvsCol$padj<0.01 & resordered_68.18DvsCol$log2FoldChange >= 1,])
+write.table(topDEgenes_68.18DvsCol, "topDEgenes_68.18DvsCol.txt", quote=F, col.names=F, row.names = F)
+topDEgenes_13.6vsCol <- rownames(resordered_13.6vsCol[resordered_13.6vsCol$padj<0.01 & resordered_13.6vsCol$log2FoldChange >= 1,])
+write.table(topDEgenes_13.6vsCol, "topDEgenes_13.6vsCol.txt", quote=F, col.names=F, row.names = F)
+topDEgenes_arid5vsCol <- rownames(resordered_arid5vsCol[resordered_arid5vsCol$padj<0.01 & resordered_arid5vsCol$log2FoldChange >= 1,])
+write.table(topDEgenes_arid5vsCol, "topDEgenes_arid5vsCol.txt", quote=F, col.names=F, row.names = F)
+topDEgenes_rlt12vsCol <- rownames(resordered_rlt12vsCol[resordered_rlt12vsCol$padj<0.01 & resordered_rlt12vsCol$log2FoldChange >= 1,])
+write.table(topDEgenes_rlt12vsCol, "topDEgenes_rlt12vsCol.txt", quote=F, col.names=F, row.names = F)
+
+######Annotate gene symbols
+#Function to annotate results and write to subsets of results to txt files
+annotateAndPrint = function(results, ddsMat, output_name) {
+  # Add gene full name
+  results$description <- mapIds(x = org.At.tair.db, keys = row.names(results), column = "GENENAME", keytype = "TAIR", multiVals = "first")
+  # Add gene symbol
+  results$symbol <- row.names(results)
+  # Add ENTREZ ID
+  results$entrez <- mapIds(x = org.At.tair.db, keys = row.names(results), column = "ENTREZID", keytype = "TAIR", multiVals = "first")
+  # Subset for only significant genes (p < 0.05)
+  results_sig <- subset(results, padj < 0.05)
+  # Write normalized gene counts to txt file
+  write.table(x = as.data.frame(counts(ddsMat), normalized = T), file = paste(output_name, 'normalized_counts.txt'), sep = '\t', quote = F, col.names = NA)
+  # Write significant normalized gene counts to a .txt file
+  write.table(x = counts(ddsMat[row.names(results_sig)], normalized = T), file = paste(output_name, 'normalized_counts_significant.txt'), sep = '\t', quote = F, col.names = NA)
+  # Write the annotated results table to a .txt file
+  write.table(x = as.data.frame(results), file = paste(output_name, "results_gene_annotated.txt"), sep = '\t', quote = F, col.names = NA)
+  # Write significant annotated results table to a .txt file
+  write.table(x = as.data.frame(results_sig), file = paste(output_name, "results_gene_annotated_significant.txt"), sep = '\t', quote = F, col.names = NA)
+  return(results_sig)
+}
+results_sig_68.18DvsCol = annotateAndPrint(res_68.18DvsCol, ddsMat_Col, "68.18DvsCol")
+results_sig_13.6vsCol = annotateAndPrint(res_13.6vsCol, ddsMat_Col, "13.6vsCol")
+results_sig_arid5vsCol = annotateAndPrint(res_arid5vsCol, ddsMat_Col, "arid5vsCol")
+results_sig_rlt12vsCol = annotateAndPrint(res_rlt12vsCol, ddsMat_Col, "rlt12vsCol")
+
+####Determine up-regulated and down-regulated genes
+s68.18DvsCol_up = subset(subset(res_68.18DvsCol, padj<0.05),log2FoldChange>0)
+s68.18DvsCol_down = subset(subset(res_68.18DvsCol, padj<0.05),log2FoldChange<0)
+s13.6vsCol_up = subset(subset(res_13.6vsCol, padj<0.05),log2FoldChange>0)
+s13.6vsCol_down = subset(subset(res_13.6vsCol, padj<0.05),log2FoldChange<0)
+arid5vsCol_up = subset(subset(res_arid5vsCol, padj<0.05),log2FoldChange>0)
+arid5vsCol_down = subset(subset(res_arid5vsCol, padj<0.05),log2FoldChange<0)
+rlt12vsCol_up = subset(subset(res_rlt12vsCol, padj<0.05),log2FoldChange>0)
+rlt12vsCol_down = subset(subset(res_rlt12vsCol, padj<0.05),log2FoldChange<0)
+
+s68.18DvsCol_upnames = rownames(s68.18DvsCol_up)
+s68.18DvsCol_downnames = rownames(s68.18DvsCol_down)
+s13.6vsCol_upnames = rownames(s13.6vsCol_up)
+s13.6vsCol_downnames = rownames(s13.6vsCol_down)
+arid5vsCol_upnames = rownames(arid5vsCol_up)
+arid5vsCol_downnames = rownames(arid5vsCol_down)
+rlt12vsCol_upnames = rownames(rlt12vsCol_up)
+rlt12vsCol_downnames = rownames(rlt12vsCol_down)
+
+write.table(x = s68.18DvsCol_upnames, file = "68.18D_upreg.txt", sep = '\t', quote = F, col.names = F, row.names=F)
+write.table(x = s68.18DvsCol_downnames, file = "68.18D_downreg.txt", sep = '\t', quote = F, col.names = F, row.names=F)
+write.table(x = s13.6vsCol_upnames, file = "13.6_upreg.txt", sep = '\t', quote = F, col.names = F, row.names=F)
+write.table(x = s13.6vsCol_downnames, file = "13.6_downreg.txt", sep = '\t', quote = F, col.names = F, row.names=F)
+write.table(x = arid5vsCol_upnames, file = "arid5_upreg.txt", sep = '\t', quote = F, col.names = F, row.names=F)
+write.table(x = arid5vsCol_downnames, file = "arid_downreg.txt", sep = '\t', quote = F, col.names = F, row.names=F)
+write.table(x = rlt12vsCol_upnames, file = "rlt12_upreg.txt", sep = '\t', quote = F, col.names = F, row.names=F)
+write.table(x = rlt12vsCol_downnames, file = "rlt12_downreg.txt", sep = '\t', quote = F, col.names = F, row.names=F)
+
+###hypergeometric test for DEG overlap
+#all DEG (13.6 and arid5 overlap)
+arid5and13.6_up = intersect(arid5vsCol_upnames, s13.6vsCol_upnames)
+arid5and13.6_down = intersect(arid5vsCol_downnames, s13.6vsCol_downnames)
+total_genes = nrow(ddsMat_Col)
+overlap = length(c(arid5and13.6_up, arid5and13.6_down))
+group1 = nrow(results_sig_arid5vsCol)
+group2 = nrow(results_sig_13.6vsCol)
+1-phyper(overlap, group1, total_genes-group1, group2)
+
+#up-regulated
+total_genes = nrow(ddsMat_Col)
+overlap = length(arid5and13.6_up)
+group1 = nrow(arid5vsCol_up)
+group2 = nrow(s13.6vsCol_up)
+1-phyper(overlap, group1, total_genes-group1, group2)
+
+#down-regulated
+total_genes = nrow(ddsMat_Col)
+overlap = length(arid5and13.6_down)
+group1 = nrow(arid5vsCol_down)
+group2 = nrow(s13.6vsCol_down)
+1-phyper(overlap, group1, total_genes-group1, group2)
+
+#Plot Venn diagram of up-regulated and down-regulated genes
+###Two-way
+futile.logger::flog.threshold(futile.logger::ERROR, name = "VennDiagramLogger") #suppress log files saving
+#function to make up-regulated Venn diagrams (2-way)
+makeVenns = function(input1_up, input2_up, input1_down, input2_down, name1, name2) {
+  venn.diagram(x=list(rownames(input1_up), rownames(input2_up)), category.names=c(name1, name2),
+               filename=paste("Venn Diagrams/",name1,"and",name2,"Up-regulated.png"), output=T, lwd = 2, fill = c("lightblue","lightgreen"), 
+               alpha=0.3, col=c("lightblue","lightgreen"), cat.pos=c(200,150), fontfamily = "sans", cat.fontfamily = "sans",
+               cat.cex=2, cex=2, main.cex=2, sub.cex=2, main.fontfamily="sans", cat.dist = c(0.03, 0.05),
+               sub=paste(name1,"and",name2), sub.fontfamily="sans", main="Up-regulated genes")
+  venn.diagram(x=list(rownames(input1_down), rownames(input2_down)), category.names=c(name1, name2),
+               filename=paste("Venn Diagrams/",name1,"and",name2,"Down-regulated.png"), output=T, lwd = 2, fill = c("pink","orange"),
+               alpha=0.3, col=c("pink","orange"), cat.pos=c(200,150), fontfamily = "sans", cat.fontfamily = "sans",
+               cat.cex=2, cex=2, main.cex=2, sub.cex=2, main.fontfamily="sans", cat.dist = c(0.03, 0.05),
+               sub=paste(name1,"and",name2), sub.fontfamily="sans", main="Down-regulated genes")
+}
+#13.6 and arid5
+makeVenns(s13.6vsCol_up, arid5vsCol_up, s13.6vsCol_down, arid5vsCol_down, "13.6", "arid5")
+#13.6 and rlt12
+makeVenns(s13.6vsCol_up, rlt12vsCol_up, s13.6vsCol_down, rlt12vsCol_down, "13.6", "rlt12")
+#arid5 and rlt12
+makeVenns(arid5vsCol_up, rlt12vsCol_up, arid5vsCol_down, rlt12vsCol_down, "arid5", "rlt12")
+#13.6 and 68.18D
+makeVenns(s13.6vsCol_up, s68.18DvsCol_up, s13.6vsCol_down, s68.18DvsCol_down, "13.6", "68.18D")
+#rlt12 and 68.18D
+makeVenns(rlt12vsCol_up, s68.18DvsCol_up, rlt12vsCol_down, s68.18DvsCol_down, "rlt12", "68.18D")
+#arid5 and 68.18D
+makeVenns(arid5vsCol_up, s68.18DvsCol_up, arid5vsCol_down, s68.18DvsCol_down, "arid5", "68.18D")
+
+###Venn diagrams with >2 samples
+#all samples compared to Col (up)
+myCol <- brewer.pal(4, "Pastel2")
+futile.logger::flog.threshold(futile.logger::ERROR, name = "VennDiagramLogger") #suppress log files saving
+venn.diagram(x=list(rownames(s13.6vsCol_up), rownames(s68.18DvsCol_up), rownames(arid5vsCol_up), rownames(rlt12vsCol_up)), 
+             category.names=c("13.6","68.18D","arid5","rlt12"),
+             filename="Venn Diagrams/All Up.png", output=T, lwd = 2, fill = myCol,
+             alpha=0.3, col=myCol, fontfamily = "sans", cat.fontfamily = "sans",
+             cat.cex=2, cex=2, main.cex=2, main.fontfamily="sans",
+             main="Up-regulated genes")
+#all samples compared to Col (down)
+venn.diagram(x=list(rownames(s13.6vsCol_down), rownames(s68.18DvsCol_down), rownames(arid5vsCol_down), rownames(rlt12vsCol_down)), 
+             category.names=c("13.6","68.18D","arid5","rlt12"),
+             filename="Venn Diagrams/All Down.png", output=T, lwd = 2, fill = myCol,
+             alpha=0.3, col=myCol, fontfamily = "sans", cat.fontfamily = "sans",
+             cat.cex=2, cex=2, main.cex=2, main.fontfamily="sans",
+             main="Down-regulated genes")
+
+#13.6, rlt12, and ari5 compared to Col
+myCol <- brewer.pal(3, "Pastel2")
+futile.logger::flog.threshold(futile.logger::ERROR, name = "VennDiagramLogger") #suppress log files saving
+#13.6, rlt12, and ari5 compared to Col (up)
+venn.diagram(x=list(rownames(s13.6vsCol_up), rownames(arid5vsCol_up), rownames(rlt12vsCol_up)), 
+             category.names=c("13.6","arid5","rlt12"),
+             filename="Venn Diagrams/arid5-rlt12-s13.6-Up.png", output=T, lwd = 2, fill = myCol,
+             alpha=0.3, col=myCol, fontfamily = "sans", cat.fontfamily = "sans",
+             cat.cex=2, cex=2, main.cex=2, main.fontfamily="sans",
+             main="Up-regulated genes")
+#13.6, rlt12, and ari5 compared to Col (down)
+venn.diagram(x=list(rownames(s13.6vsCol_down), rownames(arid5vsCol_down), rownames(rlt12vsCol_down)), 
+             category.names=c("13.6","arid5","rlt12"),
+             filename="Venn Diagrams/arid5-rlt12-s13.6-Down.png", output=T, lwd = 2, fill = myCol,
+             alpha=0.3, col=myCol, fontfamily = "sans", cat.fontfamily = "sans",
+             cat.cex=2, cex=2, main.cex=2, main.fontfamily="sans",
+             main="Down-regulated genes")
+
+#####Plot Gene Expression Data
+
+#PCA Plot
+# Convert all samples to rlog
+ddsMat_rlog <- rlog(ddsMat_Col, blind = FALSE)
+
+# Plot PCA by column variable
+plotPCA(ddsMat_rlog, intgroup = "Group", ntop = 20) +
+  theme_bw() + # remove default ggplot2 theme
+  geom_point(size = 5) + # Increase point size
+  ggtitle(label = "Principal Component Analysis (PCA)", 
+          subtitle = "Top 20 most variable genes") 
+ggsave("PCA/top20.pdf", device=pdf())
+
+#Heatmap
+res_sig_ordered_13.6vsCol = subset(resordered_13.6vsCol, padj <0.05)
+mat_13.6vsCol <- assay(ddsMat_rlog[row.names(res_sig_ordered_13.6vsCol)])
+res_sig_ordered_rlt12vsCol = subset(resordered_rlt12vsCol, padj <0.05)
+mat_rlt12vsCol <- assay(ddsMat_rlog[row.names(res_sig_ordered_rlt12vsCol)])
+res_sig_ordered_arid5vsCol = subset(resordered_arid5vsCol, padj <0.05)
+mat_arid5vsCol <- assay(ddsMat_rlog[row.names(res_sig_ordered_arid5vsCol)])
+res_sig_ordered_68.18DvsCol = subset(resordered_68.18DvsCol, padj <0.05)
+mat_68.18DvsCol <- assay(ddsMat_rlog[row.names(res_sig_ordered_68.18DvsCol)])
+
+# Choose which column variables you want to annotate the columns by.
+annotation_col = data.frame(
+  Group = factor(colData(ddsMat_rlog)$Group), 
+  Replicate = factor(colData(ddsMat_rlog)$Replicate),
+  row.names = colData(ddsMat_rlog)$sampleid
+)
+
+# Specify colors you want to annotate the columns by.
+ann_colors = list(
+  Group = c(Col = brewer.pal(5,"Set1")[1], rlt12 = brewer.pal(5,"Set1")[2], arid5 = brewer.pal(5,"Set1")[3], "13.6" = brewer.pal(5,"Set1")[4], "68.18D" = brewer.pal(5,"Set1")[5]),
+  Replicate = c(Rep1 = "gray", Rep2 = "black")
+)
+
+# Make Heatmap with pheatmap function.
+## See more in documentation for customization
+#Saves png to folder
+plotheatmap = function(mat, name) {
+  heatmap = pheatmap(mat = mat, 
+           border_color = "white", 
+           color= colorRampPalette(c("navy","white","firebrick3"))(30), 
+           scale = "row", # Scale genes to Z-score (how many standard deviations)
+           annotation_col = annotation_col, # Add multiple annotations to the samples
+           annotation_colors = ann_colors,# Change the default colors of the annotations
+           fontsize = 6.5, # Make fonts smaller
+           cellwidth = 55, # Make the cells wider
+           show_colnames = F, show_rownames = F, main = name)
+}
+heatmap_13.6vsCol = plotheatmap(mat_13.6vsCol, "DEG 13.6")
+
+##Function to save heatmap
+save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
+  stopifnot(!missing(x))
+  stopifnot(!missing(filename))
+  pdf(filename, width=width, height=height)
+  grid::grid.newpage()
+  grid::grid.draw(x$gtable)
+  dev.off()
+}
+save_pheatmap_pdf(heatmap_13.6vsCol, "heatmaps/13.6 DEG heatmap.pdf", width=10, height=10)
+
+
+#Calculate correlation matrix using Pearson's correlation
+#Log2fold changes
+#By group
+logmatrix = cbind(res_68.18DvsCol$log2FoldChange, res_13.6vsCol$log2FoldChange, res_arid5vsCol$log2FoldChange, res_rlt12vsCol$log2FoldChange)
+colnames(logmatrix) = c("68.18D", "13.6", "arid5", "rlt12")
+rownames(logmatrix) = rownames(res_68.18DvsCol)
+correlation_log_matrix = cor(logmatrix, method="pearson", use="complete.obs")
+#correlation_log_matrix = cor(logmatrix, method="spearman", use="complete.obs")
+corr_heatmap = pheatmap(mat = correlation_log_matrix, 
+                            border_color = "black", 
+                            color= colorRampPalette(c("white","navy"))(30), cluster_rows=T, cluster_cols=T,
+                            show_colnames = T, show_rownames = T, main = "Correlation Matrix")
+save_pheatmap_pdf(corr_heatmap, "Correlation/Pearson's Correlation Matrix Log2FoldChange.pdf", width=10, height=10)
+#save_pheatmap_pdf(corr_heatmap, "Correlation/Spearman Correlation Matrix Log2FoldChange.pdf", width=10, height=10)
+
+#13.6 DEGs
+logmatrix_13.6 = logmatrix[res_13.6vsCol$padj<0.05,]
+correlation_log_matrix = cor(logmatrix_13.6, method="pearson", use="complete.obs")
+write.table(correlation_log_matrix, "Correlation/Pearson's Correlation Matrix 13.6 DEG.txt")
+corr_heatmap = pheatmap(mat = correlation_log_matrix, 
+                        border_color = "black", 
+                        color= colorRampPalette(c("white","navy"))(30), cluster_rows=T, cluster_cols=T,
+                        show_colnames = T, show_rownames = T, main = "Correlation Matrix")
+save_pheatmap_pdf(corr_heatmap, "Correlation/Pearson's Correlation Matrix Log2FoldChange 13.6 DEG.pdf", width=10, height=10)
+
+#All DEGs
+logmatrix_all = logmatrix[res_13.6vsCol$padj<0.05 | res_68.18DvsCol$padj<0.05 | res_arid5vsCol$padj<0.05 | res_rlt12vsCol$padj<0.05,]
+correlation_log_matrix = cor(logmatrix_all, method="pearson", use="complete.obs")
+write.table(correlation_log_matrix, "Correlation/Pearson's Correlation Matrix all DEG.txt")
+corr_heatmap = pheatmap(mat = correlation_log_matrix, 
+                        border_color = "black", 
+                        color= colorRampPalette(c("white","navy"))(30), cluster_rows=T, cluster_cols=T,
+                        show_colnames = T, show_rownames = T, main = "Correlation Matrix")
+save_pheatmap_pdf(corr_heatmap, "Correlation/Pearson's Correlation Matrix Log2FoldChange all DEG.pdf", width=10, height=10)
+
+#All DEGs minus 68.18D
+logmatrix_all = logmatrix[res_13.6vsCol$padj<0.05 | res_arid5vsCol$padj<0.05 | res_rlt12vsCol$padj<0.05,]
+correlation_log_matrix = cor(logmatrix_all, method="pearson", use="complete.obs")
+write.table(correlation_log_matrix, "Correlation/Pearson's Correlation Matrix 13.6-rlt12-arid5 DEG.txt")
+corr_heatmap = pheatmap(mat = correlation_log_matrix, 
+                        border_color = "black", 
+                        color= colorRampPalette(c("white","navy"))(30), cluster_rows=T, cluster_cols=T,
+                        show_colnames = T, show_rownames = T, main = "Correlation Matrix")
+save_pheatmap_pdf(corr_heatmap, "Correlation/Pearson's Correlation Matrix 13.6-rlt12-arid5 DEG.pdf", width=10, height=10)
+
+#Volcano Plot
+#Function to make volcano plot
+volcanoplot = function(results, name) {
+  # Gather Log-fold change and FDR-corrected pvalues from DESeq2 results
+  ## - Change pvalues to -log10 (1.3 = 0.05)
+  data <- data.frame(gene = row.names(results), pval = -log10(results$padj), lfc = results$log2FoldChange)
+  # Remove any rows that have NA as an entry
+  data <- na.omit(data)
+  # Color the points which are up or down
+  ## If fold-change > 0 and pvalue > 1.3 (Increased significant)
+  ## If fold-change < 0 and pvalue > 1.3 (Decreased significant)
+  data <- mutate(data, color = case_when(data$lfc > 0 & data$pval > 1.3 ~ "Increased",
+                                         data$lfc < 0 & data$pval > 1.3 ~ "Decreased",
+                                         data$pval < 1.3 ~ "nonsignificant"))
+  
+  # Make a basic ggplot2 object with x-y values
+  vol <- ggplot(data, aes(x = lfc, y = pval, color = color))
+  
+  # Add ggplot2 layers
+  vol +   
+    ggtitle(label = paste("Volcano Plot",name), subtitle = "Colored by fold-change direction") +
+    geom_point(size = 2.5, alpha = 0.8, na.rm = T) +
+    scale_color_manual(name = "Directionality",
+                       values = c(Increased = "#008B00", Decreased = "#CD4F39", nonsignificant = "darkgray")) +
+    theme_bw(base_size = 14) + # change overall theme
+    theme(legend.position = "right") + # change the legend
+    xlab(paste("log2(",name,")")) + # Change X-Axis label
+    ylab(expression(-log[10]("adjusted p-value"))) + # Change Y-Axis label
+    geom_hline(yintercept = 1.3, colour = "darkgrey") + # Add p-adj value cutoff line
+    scale_y_continuous(trans = "log1p") # Scale yaxis due to large p-values
+  
+  ggsave(paste0("Volcano Plots/",name,".pdf"), device=pdf())
+}
+volcanoplot(res_68.18DvsCol, "68.18D v Col")
+volcanoplot(res_13.6vsCol, "13.6 v Col")
+volcanoplot(res_arid5vsCol, "arid5 v Col")
+volcanoplot(res_rlt12vsCol, "rlt12 v Col")
+
+#Function to make volcano plot with specific points labeled (takes in ordered results)
+volcanoplot_labeled = function(results, name, points) {
+  # Gather Log-fold change and FDR-corrected pvalues from DESeq2 results
+  ## - Change pvalues to -log10 (1.3 = 0.05)
+  data <- data.frame(gene = row.names(results), pval = -log10(results$padj), lfc = results$log2FoldChange)
+  # Remove any rows that have NA as an entry
+  data <- na.omit(data)
+  # Color the points which are up or down
+  ## If fold-change > 0 and pvalue > 1.3 (Increased significant)
+  ## If fold-change < 0 and pvalue > 1.3 (Decreased significant)
+  data <- mutate(data, color = case_when(data$lfc > 0 & data$pval > 1.3 ~ "Increased",
+                                         data$lfc < 0 & data$pval > 1.3 ~ "Decreased",
+                                         data$pval < 1.3 ~ "nonsignificant"))
+  
+  # Add gene labels
+  data <- data %>% mutate(genelabels = "")
+  data$genelabels[1:points] <- rownames(results)[1:points]
+  
+  # Make a basic ggplot2 object with x-y values
+  vol <- ggplot(data, aes(x = lfc, y = pval, color = color))
+  
+  # Add ggplot2 layers
+  vol +   
+    ggtitle(label = paste("Volcano Plot",name), subtitle = "Colored by fold-change direction") +
+    geom_point(size = 2.5, alpha = 0.8, na.rm = T) +
+    geom_text_repel(aes(label = genelabels)) +
+    scale_color_manual(name = "Directionality",
+                       values = c(Increased = "#008B00", Decreased = "#CD4F39", nonsignificant = "darkgray")) +
+    theme_bw(base_size = 14) + # change overall theme
+    theme(legend.position = "right") + # change the legend
+    xlab(paste("log2(",name,")")) + # Change X-Axis label
+    ylab(expression(-log[10]("adjusted p-value"))) + # Change Y-Axis label
+    geom_hline(yintercept = 1.3, colour = "darkgrey") + # Add p-adj value cutoff line
+    scale_y_continuous(trans = "log1p") # Scale yaxis due to large p-values
+  
+  ggsave(paste0("Volcano Plots/",name,"_labeled.pdf"), device=pdf())
+}
+volcanoplot_labeled(resordered_68.18DvsCol, "68.18D vs Col", 10)
+volcanoplot_labeled(res_13.6vsCol, "13.6 v Col", 10)
+volcanoplot_labeled(res_arid5vsCol, "arid5 v Col", 10)
+volcanoplot_labeled(res_rlt12vsCol, "rlt12 v Col", 10)
+
+#MA Plot
+make_MAplot_lfc = function(ddsMat, group) {
+  resLFC <- lfcShrink(ddsMat, coef=group, type="apeglm")
+  pdf(paste0("MA Plots/",group,".pdf"))
+  plotMA(resLFC, alpha=0.05, ylim = c(-5, 5), main=group)
+  dev.off()
+}
+make_MAplot_lfc(ddsMat_Col, "Group_68.18D_vs_Col")
+make_MAplot_lfc(ddsMat_Col, "Group_13.6_vs_Col")
+make_MAplot_lfc(ddsMat_Col, "Group_arid5_vs_Col")
+make_MAplot_lfc(ddsMat_Col, "Group_rlt12_vs_Col")
+
+#Single Gene Plots
+# Convert all samples to rlog
+ddsMat_rlog <- rlog(ddsMat_Col, blind = FALSE)
+
+## Function to make single gene plots
+singlegeneplot = function(genename, label, ddsMat) {
+  d = plotCounts(dds = ddsMat, gene = genename, intgroup = "Group", normalized = T, transform = T, returnData = T)
+  ggplot(d, aes(x = Group, y = count, color = Group)) + 
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    theme_bw() +
+    ggtitle(label) +
+    theme(plot.title = element_text(hjust = 0.5))
+  ggsave(paste0("Individual Gene Plots/",label,".pdf"), device=pdf())
+}
+
+#Flowering time genes
+#Plot FT
+singlegeneplot("AT1G65480", "FT", ddsMat_Col)
+#Plot FLC
+singlegeneplot("AT5G10140", "FLC", ddsMat_Col)
+#Plot FLC4
+singlegeneplot("AT5G65070","FLC4",ddsMat_Col)
+#Plot FUL
+singlegeneplot("AT5G60910", "FUL", ddsMat_Col)
+#Plot SOC1
+singlegeneplot("AT2G45660", "SOC1", ddsMat_Col)
+#Plot SEP1
+singlegeneplot("AT4G34190", "SEP1", ddsMat_Col)
+#Plot SEP3
+singlegeneplot("AT1G24260", "SEP3", ddsMat_Col)
+#Plot CO
+singlegeneplot("AT5G15840", "CO", ddsMat_Col)
+
+#Plot H4 (At3g53730)
+singlegeneplot("AT3G53730", "AT3G53730 (H4)", ddsMat_Col)
+#Plot H4 (At2g28740)
+singlegeneplot("AT2G28740", "AT2G28740 (H4)", ddsMat_Col)
+#Plot chr11
+singlegeneplot("AT3G06400", "CHR11", ddsMat_Col)
+#Plot chr17
+singlegeneplot("AT5G18620", "CHR17", ddsMat_Col)
+#Plot REPRESSOR OF SILENCING1
+singlegeneplot("AT2G36490", "ROS1", ddsMat_Col)
+
+#Multigene plot
+multigeneplot = function(gene_list, label, normalized_counts, metadata, gene_names=NA) {
+  gene_list <- normalized_counts %>% filter(gene %in% gene_list)
+  # Add gene labels
+  if (all(is.na(gene_names))==F) {
+    gene_list <- gene_list %>% mutate(genenames = gene_names)
+  }
+  # Gathering the columns to have normalized counts to a single column
+  gathered_list <- gene_list %>%
+    gather(colnames(gene_list)[2:8], key = "sampleid", value = "normalized_counts")
+  #combine metadata with normalized counts
+  gathered_list <- inner_join(metadata, gathered_list)
+  #Plot
+  if (all(is.na(gene_names))==T) {
+    ggplot(gathered_list) +
+      geom_point(aes(x = gene, y = normalized_counts, color=Group)) +
+      #scale_y_log10() +
+      xlab("Genes") +
+      ylab("Normalized Counts") +
+      ggtitle(label) +
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      theme(plot.title = element_text(hjust = 0.5))
+  }
+  else {
+    ggplot(gathered_list) +
+      geom_point(aes(x = genenames, y = normalized_counts, color=Group)) +
+      xlab("Genes") +
+      ylab("Normalized Counts") +
+      ggtitle(label) +
+      theme_bw() +
+      theme(text = element_text(size=20))
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      theme(plot.title = element_text(hjust = 0.5))
+  }
+  ggsave(paste0("Individual Gene Plots/",label,".pdf"), device=pdf())
+  dev.off()
+}
+
+#multigene counts on log scale
+multigeneplot_logscale = function(gene_list, label, normalized_counts, metadata, gene_names=NA) {
+  gene_list <- normalized_counts %>% filter(gene %in% gene_list)
+  # Add gene labels
+  if (all(is.na(gene_names))==F) {
+    gene_list <- gene_list %>% mutate(genenames = gene_names)
+  }
+  # Gathering the columns to have normalized counts to a single column
+  gathered_list <- gene_list %>%
+    gather(colnames(gene_list)[2:8], key = "sampleid", value = "normalized_counts")
+  #combine metadata with normalized counts
+  gathered_list <- inner_join(metadata, gathered_list)
+  #Plot
+  if (all(is.na(gene_names))==T) {
+    ggplot(gathered_list) +
+      geom_point(aes(x = gene, y = normalized_counts, color=Group)) +
+      scale_y_log10() +
+      xlab("Genes") +
+      ylab("Normalized Counts") +
+      ggtitle(label) +
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      theme(plot.title = element_text(hjust = 0.5))
+  }
+  else {
+    ggplot(gathered_list) +
+      geom_point(aes(x = genenames, y = normalized_counts, color=Group)) +
+      scale_y_log10() +
+      xlab("Genes") +
+      ylab("Normalized Counts") +
+      ggtitle(label) +
+      theme_bw() +
+      theme(text = element_text(size=20))
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      theme(plot.title = element_text(hjust = 0.5))
+  }
+  ggsave(paste0("Individual Gene Plots/",label,".pdf"), device=pdf())
+  dev.off()
+}
+
+#Make normalized counts data frame
+normalized_counts = counts(ddsMat_Col, normalized=T)
+normalized_counts <- normalized_counts %>% 
+  data.frame() %>%
+  rownames_to_column(var="gene") %>% 
+  as_tibble()
+##Relabel metadata
+metadata_alt = metadata
+metadata_alt[5,3] = "X68.18D.2"
+metadata_alt[5,1] = "X68.18D"
+metadata_alt[6,3] = "X13.6.2"
+metadata_alt[6,1] = "X13.6"
+metadata_alt[7,3] = "X13.6.1"
+metadata_alt[7,1] = "X13.6"
+metadata_alt
+##Plot top 10 DEG in 13.6
+multigeneplot(rownames(resordered_13.6vsCol)[1:10], "Top10 13.6 DEG", normalized_counts, metadata_alt)
+##Plot all H4 genes
+h4genes = c("AT1G07660", "AT1G07820", "AT2G28740", "AT3G45930", "AT3G53730", "AT3G46320", "AT5G59690", "AT5G59970")
+multigeneplot(h4genes, "Histone H4", normalized_counts, metadata_alt)
+
+##Flowering pathway analyses
+#Plot Flowering genes
+ftgenes = c("AT5G10140", "AT5G60910", "AT2G45660", "AT4G34190", "AT1G24260", "AT5G65070", "AT5G15840", "AT2G22540", 
+            "AT1G65480", "AT5G61850", "AT4G36920", "AT3G54990", "AT1G69120", "AT1G53160", "AT5G43270", "AT1G27370")
+genenames_ft = c("FLC", "FUL", "SOC1", "SEP1", "SEP3", "FLC paralog", "CONSTANS", "SVP",
+                 "FT", "LFY", "AP2", "SMZ", "AP1", "SPL4", "SPL11", "SPL10")
+#AT5G43270 (SPL2) - not in gene counts
+ft_table = cbind(ftgenes, genenames_ft)
+ft_table_selected = ft_table[c(3,9,7,4,8,2),]
+ft_table = ft_table[order(ft_table[,1]),]
+ft_table_selected = ft_table_selected[order(ft_table_selected[,1]),]
+multigeneplot(ft_table[,1], "Flowering genes", normalized_counts, metadata_alt, gene_names=ft_table[,2])
+multigeneplot(ft_table_selected[,1], "Flowering genes selected", normalized_counts, metadata_alt, gene_names=ft_table_selected[,2])
+
+###DNA damage analyses
+dnadamage = c("AT4G21070", "AT2G31970", "AT1G20750", "AT5G21150", "AT3G48190", "AT5G40820", "AT1G25580")
+genenames_ddr = c("BRCA1","RAD50", "UVH6", "AGO9", "ATM", "ATR", "SOG1")
+ddr_table = cbind(dnadamage, genenames_ddr)
+ddr_table = ddr_table[order(ddr_table[,1]),]
+multigeneplot(ddr_table[,1], "DDR genes all", normalized_counts, metadata_alt, gene_names=ddr_table[,2])
+
+###TE and DDR analyses
+te_table = cbind(shared_tes$gene, c("TE gene (copia-like)","TE gene (Ty3)"))
+ddr_te_table = rbind(ddr_shared, te_table)
+ddr_te_table = ddr_te_table[order(ddr_te_table[,1]),]
+multigeneplot(ddr_te_table[,1], "DDR and TE labeled (R17A and chr11chr17)", normalized_counts, metadata, gene_names=ddr_te_table[,2])
+
+# Correlation Scatter Plot
+#Flowering time genes correlation#read in flowering time gene data
+florid_data = read.csv("/Users/emmacorcoran/Documents/R Scripts/RNA-seq/FLORID_all.csv")
+#sort
+florid_data = florid_data[order(florid_data$Gene.Details),]
+#filter to only include flowering time genes
+gene_list <- normalized_counts %>% filter(gene %in% florid_data$Gene.Details)
+# Add gene labels
+gene_list <- florid_gene_list %>% mutate(genenames = florid_data$Short.Name)
+# Gathering the columns to have normalized counts to a single column
+gathered_list <- gene_list %>%
+  gather(colnames(gene_list)[2:8], key = "sampleid", value = "normalized_counts")
+#combine metadata with normalized counts
+gathered_list <- inner_join(metadata_alt, gathered_list)
+
+#Make tibbles
+s13.6vsCol_counts <- res_13.6vsCol %>% 
+  data.frame() %>%
+  rownames_to_column(var="gene") %>% 
+  as_tibble()
+s68.18DvsCol_counts <- res_68.18DvsCol %>% 
+  data.frame() %>%
+  rownames_to_column(var="gene") %>% 
+  as_tibble()
+rlt12vsCol_counts <- res_rlt12vsCol %>% 
+  data.frame() %>%
+  rownames_to_column(var="gene") %>% 
+  as_tibble()
+arid5vsCol_counts <- res_arid5vsCol %>% 
+  data.frame() %>%
+  rownames_to_column(var="gene") %>% 
+  as_tibble()
+
+#Filter rows to only include florid flowering genes and make matrix
+s13.6_flowering <- s13.6vsCol_counts %>% filter(gene %in% florid_data$Gene.Details)
+s13.6_logs = s13.6_flowering$log2FoldChange
+s68.18D_flowering <- s68.18DvsCol_counts %>% filter(gene %in% florid_data$Gene.Details)
+s68.18D_logs = s68.18D_flowering$log2FoldChange
+rlt12_flowering <- rlt12vsCol_counts %>% filter(gene %in% florid_data$Gene.Details)
+rlt12_logs = rlt12_flowering$log2FoldChange
+arid5_flowering <- arid5vsCol_counts %>% filter(gene %in% florid_data$Gene.Details)
+arid5_logs = arid5_flowering$log2FoldChange
+flowering_matrix = cbind(s13.6_flowering$log2FoldChange,s68.18D_flowering$log2FoldChange,
+                         rlt12_flowering$log2FoldChange,arid5_flowering$log2FoldChange)
+rownames(flowering_matrix) = s13.6_flowering$gene
+colnames(flowering_matrix) = c("13.6","68.18D","rlt12","arid5")
+flowering_matrix = data.frame(flowering_matrix)
+flowering_matrix = na.omit(flowering_matrix)
+
+#Make correlation scatterplot
+theme_set(
+  theme_bw() +
+    theme(legend.position = "top")
+)
+
+#Initiate a ggplot
+b <- ggplot(flowering_matrix, aes(x = X13.6, y = rlt12, label=rownames(flowering_matrix))) + geom_point() +
+  geom_smooth(method = lm, se = FALSE)
+# Basic scatter plot + regression line
+plotly_graph = ggplotly(b, tooltip = "all")
+htmlwidgets::saveWidget(plotly_graph, "13.6vsrlt12_correlation.html")
+
+
+#All genes correlation
+logchange_matrix = cbind(s13.6vsCol_counts$log2FoldChange,s68.18DvsCol_counts$log2FoldChange,
+                         rlt12vsCol_counts$log2FoldChange,arid5vsCol_counts$log2FoldChange)
+rownames(logchange_matrix) = s13.6vsCol_counts$gene
+colnames(logchange_matrix) = c("X13.6","X68.18D","rlt12","arid5")
+logchange_matrix = data.frame(logchange_matrix)
+logchange_matrix = na.omit(logchange_matrix)
+
+#Make correlation scatterplot
+theme_set(
+  theme_bw() +
+    theme(legend.position = "top")
+)
+#Initiate a ggplot
+b <- ggplot(logchange_matrix, aes(x = X13.6, y = rlt12, label=rownames(logchange_matrix))) + geom_point() +
+  geom_smooth(method = lm, se = FALSE)
+# Basic scatter plot + regression line
+plotly_graph = ggplotly(b, tooltip = "all")
+htmlwidgets::saveWidget(plotly_graph, "13.6_all_correlation.html")
+
+#Regression plot
+ggplotRegression <- function(fit){
+  require(ggplot2)
+  ggplot(fit$model, aes_string(x = names(fit$model)[2], y = names(fit$model)[1])) + 
+    geom_point() +
+    stat_smooth(method = "lm", col = "red") +
+    labs(title = paste("Adj R2 = ",signif(summary(fit)$adj.r.squared, 5),
+                       "Intercept =",signif(fit$coef[[1]],5 ),
+                       " Slope =",signif(fit$coef[[2]], 5),
+                       " P =",signif(summary(fit)$coef[2,4], 5)))
+}
+ggplotRegression(lm(X68.18D ~ X13.6, data = flowering_matrix))
+ggsave("Regression/68.18Dvs13.6_flowering_correlation.pdf")
+ggplotRegression(lm(rlt12 ~ X13.6, data = flowering_matrix))
+ggsave("Regression/rlt12vs13.6_flowering_correlation.pdf")
+ggplotRegression(lm(arid5 ~ X13.6, data = flowering_matrix))
+ggsave("Regression/arid5vs13.6_flowering_correlation.pdf")
+ggplotRegression(lm(arid5 ~ rlt12, data = flowering_matrix))
+ggsave("Regression/arid5vsrlt12_flowering_correlation.pdf")
+
+ggplotRegression(lm(X68.18D ~ X13.6, data = logchange_matrix))
+ggsave("Regression/68.18Dvs13.6_all_correlation.pdf")
+ggplotRegression(lm(rlt12 ~ X13.6, data = logchange_matrix))
+ggsave("Regression/rlt12vs13.6_all_correlation.pdf")
+ggplotRegression(lm(arid5 ~ X13.6, data = logchange_matrix))
+ggsave("Regression/arid5vs13.6_all_correlation.pdf")
+ggplotRegression(lm(arid5 ~ rlt12, data = logchange_matrix))
+ggsave("Regression/arid5vsrlt12_all_correlation.pdf")
+
+#####Finding Pathways for Differentially Expressed Genes
+#http://bioconductor.org/packages/release/bioc/vignettes/clusterProfiler/inst/doc/clusterProfiler.html
+##Make list of overlapping entrez IDs
+s13.6vsCol_up_entrez = subset(results_sig_13.6vsCol, log2FoldChange>0)
+s68.18DvsCol_up_entrez = subset(results_sig_68.18DvsCol, log2FoldChange>0)
+rlt12vsCol_up_entrez = subset(results_sig_rlt12vsCol,log2FoldChange>0)
+arid5vsCol_up_entrez = subset(results_sig_arid5vsCol,log2FoldChange>0)
+s13.6vsCol_down_entrez = subset(results_sig_13.6vsCol, log2FoldChange<0)
+s68.18DvsCol_down_entrez = subset(results_sig_68.18DvsCol, log2FoldChange<0)
+rlt12vsCol_down_entrez = subset(results_sig_rlt12vsCol,log2FoldChange<0)
+arid5vsCol_down_entrez = subset(results_sig_arid5vsCol,log2FoldChange<0)
+
+###Function to make barplots of KEGG Enrichment Pathways and GO Biological Pathways
+pathway_plots = function (results, name) {
+  # Create a matrix of gene log2 fold changes
+  gene_matrix <- results$log2FoldChange
+  # Add the entrezID's as names for each logFC entry
+  names(gene_matrix) <- results$entrez
+  #Enrich genes using KEGG database
+  kegg_enrich <- enrichKEGG(gene = results$symbol, organism = 'ath', pvalueCutoff = 0.05, qvalueCutoff = 0.10)
+  # Plot results
+  barplot(kegg_enrich, drop = TRUE, showCategory = 10, title = paste(name, "KEGG Enrichment Pathways"), font.size = 8)
+  ggsave(paste("Pathways/", name, "KEGG Enrichment Pathways.pdf"), device=pdf())
+  #Enrich genes using Gene Ontology
+  go_enrich <- enrichGO(gene = names(gene_matrix), OrgDb = 'org.At.tair.db', readable = T,
+                        ont = "BP", pvalueCutoff = 0.05, qvalueCutoff = 0.10)
+  # Plot results
+  barplot(go_enrich,drop = TRUE, showCategory = 10, title = paste(name, "GO Biological Pathways"), font.size = 8)
+  ggsave(paste0("Pathways/",name," GO Biological Pathways.pdf"), device=pdf())
+}
+
+#Generate barplots of pathways
+pathway_plots(results_sig_13.6vsCol, "13.6")
+pathway_plots(results_sig_68.18DvsCol, "68.18D")
+pathway_plots(results_sig_rlt12vsCol, "rlt12")
+pathway_plots(results_sig_arid5vsCol, "arid5")
