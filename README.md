@@ -1,5 +1,5 @@
 # Workflow for analyzing differential gene expression from RNA-sequencing data
-Emma Tung Corcoran (04/14/2021)
+Emma Tung Corcoran (05/26/2021)
 
 ## Introduction
 This document covers my basic workflow for processing paired-end RNA sequencing samples and analyzing differential gene expression. I used the [Ruddle HPC cluster at the Yale Center for Research Computing](https://docs.ycrc.yale.edu/clusters-at-yale/clusters/ruddle/) for my HPC environment. Sections of this workflow were adapted from [this RNA-seq tutorial](https://github.com/twbattaglia/RNAseq-workflow).
