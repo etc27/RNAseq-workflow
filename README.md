@@ -254,7 +254,7 @@ The main figures I check in the MultiQC analysis are the **Sequence Quality** fi
 ```
 #--bam: input bam file
 #-o: output file (bigwig or bedGraph format)
-bamCoverage --bam sample1.bam -o sample1.bw
+bamCoverage --bam sample1.bam -o sample1.bw --normalizeUsing BPM --numberOfProcessors 4
 ```
 
 ### Output
