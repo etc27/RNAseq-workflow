@@ -307,4 +307,4 @@ plotCorrelation -in bw-summary.npz \
 
 
 ## 8. Import Gene Counts into RStudio
-After completing the above workflow, I download final_counts.txt from the 5_final_counts folder onto my personal computer and use **RStudio** to normalize and perform statistical analysis between sample groups. An example of the R code that I use to perform this analysis is uploaded into the **R** folder.
+After completing the above workflow, I download final_counts.txt from the 5_final_counts folder onto my personal computer and use **RStudio** and **JupyterLab** to normalize and perform statistical analysis between sample groups. An example of the code that I use to perform this analysis is uploaded into the **R and Python** folder.
